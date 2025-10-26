@@ -1,0 +1,26 @@
+{
+  "name": "pod-abstract-driver",
+  "version": "1.0.0",
+  "description": "The abstract driver module for podcast control",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/splcode/pod-shared.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/splcode/pod-shared/issues"
+  },
+  "homepage": "https://github.com/splcode/pod-shared#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@splcode/state-server": "1.1.0"
+  }
+}
