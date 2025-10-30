@@ -10,9 +10,9 @@ const packageJson = getPackageJson(packageJsonPath);
 
 writePackageJson(packageJsonPath, packageJson);
 createDist(projectPath);
+createGitignore(projectPath);
 createDriver(projectPath);
 
-// Install dependencies
 console.log("Installing dependencies...");
 execSync("npm install", { cwd: projectPath, stdio: "inherit" });
 console.log("\n✅ Setup complete!");
@@ -71,11 +71,22 @@ function writePackageJson(packageJsonPath, packageJson) {
 }
 
 function createDist(projectPath) {
-  // Create dist directory if it doesn't exist
   const distPath = path.join(projectPath, "dist");
+
+  // Create dist directory if it doesn't exist
   if (!fs.existsSync(distPath)) {
     fs.mkdirSync(distPath, { recursive: true });
     console.log("Created dist/");
+  }
+}
+
+function createGitignore(projectPath) {
+  const gitignorePath = path.join(projectPath, ".gitignore");
+
+  // Create .gitignore if it doesn't exist
+  if (!fs.existsSync(gitignorePath)) {
+    fs.writeFileSync(gitignorePath, "node_modules/\ndist/\n");
+    console.log("Created .gitignore");
   }
 }
 
