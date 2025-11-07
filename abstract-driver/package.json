@@ -1,5 +1,5 @@
 {
-  "name": "pod-abstract-driver",
+  "name": "@splcode/pod-abstract-driver",
   "version": "1.0.0",
   "description": "The abstract driver module for podcast control",
   "main": "index.js",
