@@ -1,4 +1,4 @@
 import { EventEmitter } from 'node:events';
 class EventBus extends EventEmitter {}
-const eventBus = new EventBus();
-export default eventBus;
+globalThis.eventBus = globalThis.eventBus || new EventBus();
+export default globalThis.eventBus;
