@@ -60,7 +60,7 @@ function writePackageJson(packageJsonPath, packageJson) {
     packageJson.devDependencies = {};
   }
 
-  packageJson.dependencies["@splcode/pod-abstract-driver"] = "^1.2.0";
+  packageJson.dependencies["@splcode/pod-abstract-driver"] = "^1.3.0";
   packageJson.devDependencies.esbuild = "^0.25.11";
 
   // Write package.json
