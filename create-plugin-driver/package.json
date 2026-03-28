@@ -1,6 +1,6 @@
 {
   "name": "@splcode/create-plugin-driver",
-  "version": "1.4.0",
+  "version": "2.0.0",
   "description": "An npm initializer for creating custom plugin drivers",
   "type": "module",
   "bin": "./index.js",
@@ -9,5 +9,8 @@
   "publishConfig": {
     "access": "public"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "prompts": "^2.4.2"
+  }
 }
