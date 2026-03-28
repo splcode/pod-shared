@@ -66,10 +66,6 @@ writePackageJson(opts);
 // --- .gitignore ---
 writeGitignore(uiType);
 
-// --- dist/ (esbuild output, non-mantine only) ---
-if (uiType !== "mantine") {
-  fs.mkdirSync(path.join(projectPath, "dist"), { recursive: true });
-}
 
 // --- index.js (driver) ---
 if (!fs.existsSync(path.join(projectPath, "index.js"))) {
@@ -119,17 +115,6 @@ function writePackageJson({ uiType }) {
   if (uiType === "mantine") {
     packageJson.scripts.build = "cd ui && npx --no-install vite build";
     packageJson.scripts.watch = "cd ui && npx --no-install vite build --watch";
-  } else {
-    packageJson.scripts.build = [
-      "npx esbuild index.js",
-      "--bundle",
-      "--format=esm",
-      "--platform=node",
-      "--outfile=dist/output.js",
-      "--banner:js=\"import { createRequire } from 'module';",
-      'const require = createRequire(import.meta.url);"',
-    ].join(" ");
-    packageJson.devDependencies.esbuild = "^0.25.11";
   }
 
   packageJson.dependencies["@splcode/pod-abstract-driver"] = "^1.4.0";
@@ -145,8 +130,6 @@ function writeGitignore(uiType) {
   const ignores = ["node_modules/", ".DS_Store"];
   if (uiType === "mantine") {
     ignores.push("ui/node_modules/", "ui/dist/");
-  } else {
-    ignores.push("dist/");
   }
 
   fs.writeFileSync(gitignorePath, ignores.join("\n") + "\n");

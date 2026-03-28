@@ -33,12 +33,7 @@ MyPlugin/
 
 ### None (schema-driven)
 
-No UI folder. The driver declares its interface via `getUiLayout()` using built-in component types (`card`, `stack`, `text`, `commandButton`, `toggleSwitch`, `textMeter`, etc.). The host app renders these automatically.
-
-```
-MyPlugin/
-  dist/             # esbuild output
-```
+No UI folder. The driver declares its interface via `getUiLayout()` using built-in component types (`card`, `stack`, `text`, `commandButton`, `toggleSwitch`, `textMeter`, etc.). The host app renders these automatically. No build step required.
 
 ### Vanilla (custom element)
 
@@ -70,9 +65,10 @@ MyPlugin/
 
 ## Build commands
 
+None and Vanilla plugins have no build step — the host loads `index.js` and `ui/ui.js` directly.
+
 | Type | Command | Description |
 |------|---------|-------------|
-| None / Vanilla | `npm run build` | Bundles the driver with esbuild |
 | Mantine | `npm run build` | Builds the UI with Vite |
 | Mantine | `npm run watch` | Rebuilds the UI on file changes |
 
