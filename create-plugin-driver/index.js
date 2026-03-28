@@ -69,23 +69,23 @@ if (!packageJson.scripts) packageJson.scripts = {};
 if (!packageJson.dependencies) packageJson.dependencies = {};
 if (!packageJson.devDependencies) packageJson.devDependencies = {};
 
-packageJson.scripts.build = [
-  "npx esbuild index.js",
-  "--bundle",
-  "--format=esm",
-  "--platform=node",
-  "--outfile=dist/output.js",
-  "--banner:js=\"import { createRequire } from 'module';",
-  'const require = createRequire(import.meta.url);"',
-].join(" ");
-
 if (uiType === "mantine") {
-  packageJson.scripts["build:ui"] = "cd ui && npx --no-install vite build";
-  packageJson.scripts["build:all"] = "npm run build && npm run build:ui";
+  packageJson.scripts.build = "cd ui && npx --no-install vite build";
+  packageJson.scripts.watch = "cd ui && npx --no-install vite build --watch";
+} else {
+  packageJson.scripts.build = [
+    "npx esbuild index.js",
+    "--bundle",
+    "--format=esm",
+    "--platform=node",
+    "--outfile=dist/output.js",
+    "--banner:js=\"import { createRequire } from 'module';",
+    'const require = createRequire(import.meta.url);"',
+  ].join(" ");
+  packageJson.devDependencies.esbuild = "^0.25.11";
 }
 
 packageJson.dependencies["@splcode/pod-abstract-driver"] = "^1.4.0";
-packageJson.devDependencies.esbuild = "^0.25.11";
 
 fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + "\n");
 console.log("✓ package.json");
@@ -93,14 +93,23 @@ console.log("✓ package.json");
 // --- .gitignore ---
 const gitignorePath = path.join(projectPath, ".gitignore");
 if (!fs.existsSync(gitignorePath)) {
-  fs.writeFileSync(gitignorePath, "node_modules/\ndist/\nui/node_modules/\nui/dist/\n");
+  const ignores = ["node_modules/", ".DS_Store"];
+  if (uiType === "mantine") {
+    ignores.push("ui/node_modules/", "ui/dist/");
+  }
+  if (uiType !== "mantine") {
+    ignores.push("dist/");
+  }
+  fs.writeFileSync(gitignorePath, ignores.join("\n") + "\n");
   console.log("✓ .gitignore");
 }
 
-// --- dist/ ---
-const distPath = path.join(projectPath, "dist");
-if (!fs.existsSync(distPath)) {
-  fs.mkdirSync(distPath, { recursive: true });
+// --- dist/ (only for non-mantine — esbuild output) ---
+if (uiType !== "mantine") {
+  const distPath = path.join(projectPath, "dist");
+  if (!fs.existsSync(distPath)) {
+    fs.mkdirSync(distPath, { recursive: true });
+  }
 }
 
 // --- index.js (driver) ---
@@ -124,12 +133,15 @@ execSync("npm install", { cwd: projectPath, stdio: "inherit" });
 if (uiType === "mantine") {
   console.log("\nInstalling UI dependencies...");
   execSync("npm install", { cwd: path.join(projectPath, "ui"), stdio: "inherit" });
+
+  console.log("\nBuilding UI...");
+  execSync("npm run build", { cwd: projectPath, stdio: "inherit" });
 }
 
 console.log("\n✅ Plugin created!");
 if (uiType === "mantine") {
-  console.log(`\nTo build the UI: npm run build:ui`);
-  console.log(`To build everything: npm run build:all`);
+  console.log(`\nTo rebuild: npm run build`);
+  console.log(`To watch for changes: npm run watch`);
 } else if (uiType === "vanilla") {
   console.log(`\nThe vanilla UI (ui/ui.js) requires no build step.`);
 }
@@ -216,7 +228,7 @@ function generateDriver(className, uiType, pluginId, tagName, jsFileName, uiTab)
     };
   }`;
 
-  return `import { PodcartAbstractDriver } from '@splcode/pod-abstract-driver';
+  return `import { PodcartAbstractDriver, eventBus } from '@splcode/pod-abstract-driver';
 
 export default class ${className} extends PodcartAbstractDriver {
   counter = 0;
@@ -228,16 +240,31 @@ export default class ${className} extends PodcartAbstractDriver {
     this._registerMeter('checked', this.checked);
     this._registerMeter('checkedLabel', 'server says unchecked');
     this._registerMeter('configInfo', 'Config IP: ' + (this.config && this.config.ip || 'not set'));
+
+    // Listen for plugin UI events
+    this._onPluginEvent = (event) => {
+      if (event.deviceId !== this.name) return;
+      if (event.channel === 'counter.increment') {
+        this.counter += 1;
+        this._meterEcho('counter', this.counter);
+        this.log.info('Counter incremented to', this.counter);
+      }
+    };
+    eventBus.on('plugin:event:counter.increment', this._onPluginEvent);
   }
 
-  async _disconnect() {}
+  async _disconnect() {
+    if (this._onPluginEvent) {
+      eventBus.off('plugin:event:counter.increment', this._onPluginEvent);
+    }
+  }
 
   async _get(meterName) {
     switch (meterName) {
       case 'counter': return this.counter;
       case 'checked': return this.checked;
       case 'checkedLabel': return this.checked ? 'server says checked' : 'server says unchecked';
-      case 'configInfo': return 'Config IP: ' + (this.config.ip || 'not set');
+      case 'configInfo': return 'Config IP: ' + (this.config && this.config.ip || 'not set');
     }
   }
 
@@ -245,7 +272,7 @@ export default class ${className} extends PodcartAbstractDriver {
     this.log.info('SET', meterName, value);
     switch (meterName) {
       case 'counter':
-        // Counter increments server-side — value from client is ignored
+        // Also handled via commandButton in schema UI mode
         this.counter += 1;
         this._meterEcho('counter', this.counter);
         break;
@@ -323,35 +350,14 @@ function createVanillaUI(projectPath, className, tagName, pluginId) {
 
     this.shadowRoot.innerHTML = \`
       <style>
-        :host {
-          display: block;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          color: #e0e0e0;
-        }
-        .panel {
-          border: 1px solid rgba(255, 255, 255, 0.15);
-          border-radius: 12px;
-          padding: 24px;
-          background: rgba(255, 255, 255, 0.04);
-        }
-        h2 { margin: 0 0 8px; font-size: 20px; }
+        :host { display: block; font-family: system-ui, sans-serif; color: #ccc; }
+        h2 { margin: 0 0 12px; }
         .row { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
-        .status { color: rgba(255, 255, 255, 0.6); margin-top: 8px; }
-        .config { color: rgba(255, 255, 255, 0.4); font-family: monospace; font-size: 12px; margin-top: 12px; }
-        button {
-          padding: 8px 16px;
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          border-radius: 8px;
-          background: rgba(255, 255, 255, 0.08);
-          color: #e0e0e0;
-          cursor: pointer;
-          font-size: 14px;
-        }
-        button:hover { background: rgba(255, 255, 255, 0.15); }
+        .dim { color: #888; margin-top: 8px; }
+        .mono { color: #666; font-family: monospace; font-size: 12px; margin-top: 12px; }
         label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-        input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
       </style>
-      <div class="panel">
+      <div>
         <h2>${className}</h2>
         <div class="row">
           <button id="increment">Count Up</button>
@@ -363,15 +369,15 @@ function createVanillaUI(projectPath, className, tagName, pluginId) {
             Toggle
           </label>
         </div>
-        <p class="status" id="checked-status">server says unchecked</p>
-        <p class="config" id="config-info">loading config...</p>
+        <p class="dim" id="checked-status">server says unchecked</p>
+        <p class="mono" id="config-info">loading config...</p>
       </div>
     \`;
 
     this.shadowRoot.querySelector('#increment')?.addEventListener('click', () => {
       if (!this.podcartHost) return;
-      // Signal the server to increment — the actual count happens server-side
-      this.podcartHost.setMeter('counter', null);
+      // Fire an event to the server — the actual count happens server-side
+      this.podcartHost.sendEvent({ channel: 'counter.increment' });
     });
 
     this.shadowRoot.querySelector('#checked')?.addEventListener('change', (e) => {
@@ -493,6 +499,7 @@ interface PodcartPluginHost {
         listener: (update: { value: unknown; skipLock: boolean }) => void
     ) => () => void;
     setMeter: (meter: string, value: unknown) => void;
+    sendEvent: (request: { channel: string; payload?: unknown }) => Promise<unknown>;
 }
 
 const HostContext = createContext<PodcartPluginHost | null>(null);
@@ -546,6 +553,20 @@ export function usePluginMeter(meter: string): [any, boolean, (v: any) => void] 
 
     return [value, locked, set];
 }
+
+/**
+ * Returns a function that sends a plugin event to the server.
+ */
+export function usePluginEvent(channel: string) {
+    const host = useContext(HostContext);
+    return useCallback(
+        (payload?: unknown) => {
+            if (!host) return;
+            host.sendEvent({ channel, payload });
+        },
+        [host, channel]
+    );
+}
 `
   );
   console.log("✓ ui/src/bridge.tsx");
@@ -582,42 +603,41 @@ export const theme = createTheme({
   // ui/src/App.tsx
   fs.writeFileSync(
     path.join(srcDir, "App.tsx"),
-    `import { Box, Button, Card, Checkbox, Group, Stack, Text } from '@mantine/core';
-import { usePluginMeter } from './bridge';
+    `import { Button, Card, Checkbox, Group, Stack, Text } from '@mantine/core';
+import { usePluginMeter, usePluginEvent } from './bridge';
 
 export function App() {
-    const [counter, , setCounter] = usePluginMeter('counter');
+    const [counter] = usePluginMeter('counter');
     const [checked, , setChecked] = usePluginMeter('checked');
     const [configInfo] = usePluginMeter('configInfo');
+    const incrementCounter = usePluginEvent('counter.increment');
 
     return (
-        <Box p="md">
-            <Card withBorder p="lg">
-                <Text fw={700} size="xl" mb="md">
-                    ${className}
+        <Card withBorder p="lg">
+            <Text fw={700} size="xl" mb="md">
+                ${className}
+            </Text>
+            <Stack gap="md">
+                <Group>
+                    <Button onClick={() => incrementCounter()}>
+                        Count Up
+                    </Button>
+                    <Text>Counter: <strong>{String(counter)}</strong></Text>
+                </Group>
+                <Checkbox
+                    label="Toggle"
+                    size="lg"
+                    checked={Boolean(checked)}
+                    onChange={(e) => setChecked(e.currentTarget.checked)}
+                />
+                <Text c="dimmed">
+                    {checked ? 'server says checked' : 'server says unchecked'}
                 </Text>
-                <Stack gap="md">
-                    <Group>
-                        <Button onClick={() => setCounter(null)}>
-                            Count Up
-                        </Button>
-                        <Text>Counter: <strong>{String(counter)}</strong></Text>
-                    </Group>
-                    <Checkbox
-                        label="Toggle"
-                        size="lg"
-                        checked={Boolean(checked)}
-                        onChange={(e) => setChecked(e.currentTarget.checked)}
-                    />
-                    <Text c="dimmed">
-                        {checked ? 'server says checked' : 'server says unchecked'}
-                    </Text>
-                    <Text size="xs" c="dimmed" ff="monospace">
-                        {String(configInfo || 'loading config...')}
-                    </Text>
-                </Stack>
-            </Card>
-        </Box>
+                <Text size="xs" c="dimmed" ff="monospace">
+                    {String(configInfo || 'loading config...')}
+                </Text>
+            </Stack>
+        </Card>
     );
 }
 `
