@@ -107,7 +107,7 @@ eventBus.on('sessionEnded', () => {
 **Client-to-server** — plugin UIs send events that get routed through the eventBus:
 
 ```js
-// Browser sends (via podcartHost.sendEvent)
+// Browser sends (via uiHost.sendEvent)
 sendEvent({ channel: 'counter.increment', payload: { amount: 1 } });
 
 // Server routes to eventBus as:
@@ -173,19 +173,19 @@ getUiLayout() {
 The host app:
 1. Loads the entry JS via dynamic `import()`
 2. Creates the custom element (`<my-plugin-ui>`)
-3. Injects a `podcartHost` bridge object
-4. Dispatches `podcart-host-ready` event
+3. Injects a `uiHost` bridge object
+4. Dispatches `ui-host-ready` event
 
 ## Plugin UI Bridge
 
-The `podcartHost` object is the plugin's interface to the Podcart system. It is set on the custom element by the host before dispatching `podcart-host-ready`.
+The `uiHost` object is the plugin's interface to the Podcart system. It is set on the custom element by the host before dispatching `ui-host-ready`.
 
-### podcartHost.subscribeMeter(name, callback)
+### uiHost.subscribeMeter(name, callback)
 
 Subscribe to a meter. The name is device-local — `subscribeMeter('brightness')` subscribes to `myDevice/brightness` automatically. Returns an unsubscribe function.
 
 ```js
-const unsub = this.podcartHost.subscribeMeter('brightness', ({ value, skipLock }) => {
+const unsub = this.uiHost.subscribeMeter('brightness', ({ value, skipLock }) => {
   console.log('brightness is now', value);
 });
 
@@ -193,20 +193,20 @@ const unsub = this.podcartHost.subscribeMeter('brightness', ({ value, skipLock }
 unsub();
 ```
 
-### podcartHost.setMeter(name, value)
+### uiHost.setMeter(name, value)
 
 Push a value to a meter. Triggers the driver's `_set()` method.
 
 ```js
-this.podcartHost.setMeter('brightness', 75);
+this.uiHost.setMeter('brightness', 75);
 ```
 
-### podcartHost.sendEvent({ channel, payload })
+### uiHost.sendEvent({ channel, payload })
 
 Send a command to the server. The server routes it through the eventBus as `plugin:event:{channel}`. Use this for actions ("do something") rather than state ("set this value").
 
 ```js
-this.podcartHost.sendEvent({
+this.uiHost.sendEvent({
   channel: 'counter.increment',
   payload: { amount: 5 },
 });

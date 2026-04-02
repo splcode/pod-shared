@@ -101,23 +101,28 @@ export default defineConfig({
 function bridgeTsx() {
   return `import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
-interface PodcartPluginHost {
+interface PluginHost {
     deviceId: string;
     subscribeMeter: (
         meter: string,
         listener: (update: { value: unknown; skipLock: boolean }) => void
     ) => () => void;
     setMeter: (meter: string, value: unknown) => void;
+    subscribeAnyMeter: (
+        absolutePath: string,
+        listener: (update: { value: unknown; skipLock: boolean }) => void
+    ) => () => void;
+    setAnyMeter: (absolutePath: string, value: unknown) => void;
     sendEvent: (request: { channel: string; payload?: unknown }) => Promise<unknown>;
 }
 
-const HostContext = createContext<PodcartPluginHost | null>(null);
+const HostContext = createContext<PluginHost | null>(null);
 
 export function HostProvider({
     host,
     children,
 }: {
-    host: PodcartPluginHost;
+    host: PluginHost;
     children: React.ReactNode;
 }) {
     return <HostContext.Provider value={host}>{children}</HostContext.Provider>;
@@ -158,6 +163,46 @@ export function usePluginMeter(meter: string): [any, boolean, (v: any) => void] 
             host.setMeter(meter, v);
         },
         [host, meter]
+    );
+
+    return [value, locked, set];
+}
+
+/**
+ * Subscribe to any meter using an absolute path (e.g. 'otherDevice/meterName').
+ * Returns [value, locked, setValue] — same shape as usePluginMeter.
+ */
+export function useAnyMeter(absolutePath: string): [any, boolean, (v: any) => void] {
+    const host = useContext(HostContext);
+    const [value, setValue] = useState<any>(0);
+    const [locked, setLocked] = useState(false);
+    const unlockTimer = useRef<ReturnType<typeof setTimeout>>();
+
+    useEffect(() => {
+        if (!host) return;
+
+        const unsub = host.subscribeAnyMeter(absolutePath, ({ value: v, skipLock }) => {
+            if (!skipLock) {
+                setLocked(true);
+                clearTimeout(unlockTimer.current);
+                unlockTimer.current = setTimeout(() => setLocked(false), 150);
+            }
+            setValue(v);
+        });
+
+        return () => {
+            unsub();
+            clearTimeout(unlockTimer.current);
+        };
+    }, [host, absolutePath]);
+
+    const set = useCallback(
+        (v: any) => {
+            if (!host) return;
+            setValue(v);
+            host.setAnyMeter(absolutePath, v);
+        },
+        [host, absolutePath]
     );
 
     return [value, locked, set];
@@ -272,7 +317,7 @@ class ${className}UI extends HTMLElement {
         this.root = createRoot(container);
         this.renderApp();
 
-        this.addEventListener('podcart-host-ready', () => this.renderApp());
+        this.addEventListener('ui-host-ready', () => this.renderApp());
     }
 
     disconnectedCallback() {
@@ -283,7 +328,7 @@ class ${className}UI extends HTMLElement {
     private renderApp() {
         if (!this.root) return;
 
-        const host = (this as any).podcartHost;
+        const host = (this as any).uiHost;
         if (!host) return;
 
         this.root.render(

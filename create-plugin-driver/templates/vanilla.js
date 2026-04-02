@@ -23,21 +23,21 @@ function generateVanillaElement(className, tagName) {
 
     this.render();
     this.initializeHost();
-    this.addEventListener('podcart-host-ready', this.initializeHost);
+    this.addEventListener('ui-host-ready', this.initializeHost);
   }
 
   disconnectedCallback() {
-    this.removeEventListener('podcart-host-ready', this.initializeHost);
+    this.removeEventListener('ui-host-ready', this.initializeHost);
     this._unsubs?.forEach((unsub) => unsub());
     this._unsubs = [];
   }
 
   initializeHost = () => {
-    if (!this.podcartHost || this._initialized) return;
+    if (!this.uiHost || this._initialized) return;
     this._initialized = true;
 
     ['counter', 'checked', 'configInfo'].forEach((meter) => {
-      const unsub = this.podcartHost.subscribeMeter(meter, ({ value }) => {
+      const unsub = this.uiHost.subscribeMeter(meter, ({ value }) => {
         this._meters[meter] = value;
         this.syncUI();
       });
@@ -89,14 +89,14 @@ function generateVanillaElement(className, tagName) {
     \`;
 
     this.shadowRoot.querySelector('#increment')?.addEventListener('click', () => {
-      if (!this.podcartHost) return;
+      if (!this.uiHost) return;
       // Fire an event to the server — the actual count happens server-side
-      this.podcartHost.sendEvent({ channel: 'counter.increment' });
+      this.uiHost.sendEvent({ channel: 'counter.increment' });
     });
 
     this.shadowRoot.querySelector('#checked')?.addEventListener('change', (e) => {
-      if (!this.podcartHost) return;
-      this.podcartHost.setMeter('checked', e.target.checked);
+      if (!this.uiHost) return;
+      this.uiHost.setMeter('checked', e.target.checked);
     });
   }
 }
