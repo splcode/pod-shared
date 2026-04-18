@@ -117,7 +117,7 @@ function writePackageJson({ uiType }) {
     packageJson.scripts.watch = "cd ui && npx --no-install vite build --watch";
   }
 
-  packageJson.dependencies["@splcode/pod-abstract-driver"] = "^2.0.0";
+  packageJson.dependencies["@splcode/pod-abstract-driver"] = "^2.0.1";
 
   fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + "\n");
   console.log("✓ package.json");
